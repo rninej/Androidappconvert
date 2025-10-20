@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PWA → APK Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    label { display: block; margin-top: 1em; }
+    input, button { width: 100%; padding: 0.5em; margin-top: 0.5em; }
+    #status { margin-top: 1em; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>PWA → APK Generator</h1>
+  <label>
+    PWA Manifest URL (or your site’s root manifest.json URL)
+    <input type="url" id="manifestUrl" placeholder="https://example.com/manifest.json" />
+  </label>
+  <label>
+    Package ID (e.g. com.example.myapp)
+    <input type="text" id="packageId" placeholder="com.example.myapp" />
+  </label>
+  <label>
+    App Version (e.g. 1.0.0)
+    <input type="text" id="appVersion" placeholder="1.0.0" />
+  </label>
+  <label>
+    App Version Code (integer, e.g. 1)
+    <input type="number" id="versionCode" placeholder="1" />
+  </label>
+  <button id="btnBuild">Build APK / AAB</button>
+  <div id="status"></div>
+
+  <script>
+    document.getElementById('btnBuild').onclick = async () => {
+      const manifestUrl = document.getElementById('manifestUrl').value.trim();
+      const packageId = document.getElementById('packageId').value.trim();
+      const appVersion = document.getElementById('appVersion').value.trim();
+      const versionCode = parseInt(document.getElementById('versionCode').value);
+
+      if (!manifestUrl || !packageId || !appVersion || !versionCode) {
+        document.getElementById('status').innerText = "Please fill all fields.";
+        return;
+      }
+
+      document.getElementById('status').innerText = "Requesting build from PWABuilder...";
+
+      try {
+        const payload = {
+          "webManifestUrl": manifestUrl,
+          "appVersion": appVersion,
+          "appVersionCode": versionCode,
+          "packageId": packageId,
+          // Additional defaults or fields as necessary:
+          "signingMode": "none",
+          "features": { },
+          "fallbackType": "customtabs"
+        };
+
+        // This is the CloudAPK / PWABuilder build endpoint (from their docs) 2
+        const buildEndpoint = "https://cloudapk.azurewebsites.net/generateAppPackage";
+
+        const resp = await fetch(buildEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error("Build API failed: " + resp.status + " — " + err);
+        }
+
+        const blob = await resp.blob();
+        // Assume response is a ZIP containing APK/AAB etc.
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `app_${packageId}_${appVersion}.zip`;
+        a.innerText = "Download Build (ZIP containing APK / AAB)";
+        a.style.display = "block";
+        document.getElementById('status').innerText = "";
+        document.getElementById('status').appendChild(a);
+      } catch(err) {
+        document.getElementById('status').innerText = "Error: " + err.toString();
+      }
+    }
+  </script>
+</body>
+</html>
